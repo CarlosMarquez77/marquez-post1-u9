@@ -60,6 +60,33 @@ puede afirmar los límites exactos de la consulta (10 de agosto 09:00 a
 con el servicio. Además no interesa verificar cuántas veces se leyó el
 reloj, solo que la hora sea conocida.
 
+### Diagnóstico antes del refactor (Parte 2)
+`enviarRecordatorioUrgente(Long citaId)` funciona al ejecutarlo, pero
+no se puede probar de forma aislada. La línea responsable es la 52 de
+`CitaReminderServiceImpl.java`:
+
+```java
+ReminderChannel canalUrgente = new SmsReminderChannel(new TwilioNotificadorSmsGateway());
+```
+
+El canal y el gateway se construyen con `new` dentro del método, así
+que la prueba no tiene por dónde entregarle al servicio un canal
+distinto. El escenario que más interesa probar, "el gateway de SMS
+falla y la cita no debe quedar marcada como enviada", es imposible de
+escribir: no hay forma de hacer que `TwilioNotificadorSmsGateway`
+lance una excepción desde la prueba, y cada ejecución usaría el
+gateway real.
+
+La diferencia con `enviarRecordatoriosPendientes()` está en la línea
+39: ahí el canal sale de `reminderChannelFactory.obtenerCanal(...)`, y
+la Factory llegó por el constructor (línea 22). Por eso en la Parte 1
+bastó pasar un `@Mock ReminderChannelFactory` para decidir qué canal
+recibe el servicio. El método urgente viola DIP porque el servicio
+depende de dos clases concretas en vez de la abstracción
+`ReminderChannel`. `Mockito.mockConstruction()` podría interceptar ese
+`new`, pero sería arreglar con la herramienta de pruebas un problema
+que es del diseño.
+
 ## Ejecutar las pruebas
 ```bash
 mvn test                  # Pruebas unitarias
